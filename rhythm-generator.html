@@ -1,0 +1,1593 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Rhythm Generator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap">
+
+<style>
+/* =============================================
+   LAYOUT: full-height app, header + controls + display
+   COLOR: dark-first, drumhead parchment accent on near-black
+   TYPE: Space Mono (UI/numbers), Inter (labels/body)
+   ============================================= */
+:root {
+  --bg: #f5f2ec;
+  --surface: #ffffff;
+  --surface2: #edeae3;
+  --border: #d8d3c8;
+  --fg: #1a1814;
+  --fg2: #5a5650;
+  --accent: #c45a1a;
+  --accent-hover: #a34815;
+  --beat-active: #c45a1a;
+  --beat-rest: #9ba0a8;
+  --note-selected: #c45a1a22;
+  --note-selected-border: #c45a1a;
+  --note-unselected: #f5f2ec;
+  --note-unselected-border: #d8d3c8;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.06);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f0e0c;
+    --surface: #1c1a17;
+    --surface2: #252219;
+    --border: #38352d;
+    --fg: #f0ece4;
+    --fg2: #8a8680;
+    --accent: #e07240;
+    --accent-hover: #f08050;
+    --beat-active: #e07240;
+    --beat-rest: #4a4e55;
+    --note-selected: #e0724022;
+    --note-selected-border: #e07240;
+    --note-unselected: #1c1a17;
+    --note-unselected-border: #38352d;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f0e0c;
+  --surface: #1c1a17;
+  --surface2: #252219;
+  --border: #38352d;
+  --fg: #f0ece4;
+  --fg2: #8a8680;
+  --accent: #e07240;
+  --accent-hover: #f08050;
+  --beat-active: #e07240;
+  --beat-rest: #4a4e55;
+  --note-selected: #e0724022;
+  --note-selected-border: #e07240;
+  --note-unselected: #1c1a17;
+  --note-unselected-border: #38352d;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0;
+  min-height: 100%;
+}
+
+/* ---- HEADER ---- */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.app-title {
+  font-family: 'Space Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--fg);
+}
+.app-title span { color: var(--accent); }
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---- MAIN CONTENT ---- */
+.app-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-block: 20px;
+}
+
+/* ---- RHYTHM DISPLAY ---- */
+.rhythm-display {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px 20px;
+  box-shadow: var(--shadow);
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.measures-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  align-items: center;
+}
+
+.measure-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.measure-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  color: var(--fg2);
+  min-width: 20px;
+  text-align: center;
+}
+
+.measure-beats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.beat-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 10px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--surface2);
+  transition: border-color 0.15s, background 0.15s, transform 0.08s;
+  position: relative;
+  cursor: default;
+  min-width: 64px;
+  min-height: 56px;
+}
+
+.beat-group.active {
+  border-color: var(--beat-active);
+  background: var(--note-selected);
+  transform: translateY(-1px);
+}
+
+.beat-group.played {
+  border-color: var(--beat-rest);
+}
+
+.beat-group.frozen {
+  border-color: #5b9bd5;
+  background: rgba(91, 155, 213, 0.12);
+  cursor: pointer;
+}
+
+.beat-group:not(.frozen) {
+  cursor: pointer;
+}
+
+.beat-group.frozen::after {
+  content: '🔒';
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 9px;
+  opacity: 0.7;
+  line-height: 1;
+}
+
+.note-visual {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1px;
+  min-width: 10px;
+}
+
+/* SVG note rendering inline */
+.note-svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--fg2);
+  font-size: 14px;
+  padding: 20px 0;
+}
+.empty-state p:first-child {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+/* ---- TRANSPORT ---- */
+.transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background 0.15s, transform 0.08s, opacity 0.15s;
+  padding: 10px 20px;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  min-width: 130px;
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover:not(:disabled) { background: var(--border); }
+
+.btn-icon {
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-icon:hover { background: var(--border); }
+
+/* ---- SETTINGS ROW ---- */
+.settings-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 100px;
+}
+
+.setting-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg2);
+}
+
+.setting-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bpm-display {
+  font-family: 'Space Mono', monospace;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  min-width: 60px;
+  text-align: center;
+}
+
+input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 4px;
+  cursor: pointer;
+}
+
+select {
+  background: var(--surface2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* ---- NOTE SELECTOR ---- */
+.note-selector-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: var(--shadow);
+}
+
+.note-selector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg2);
+}
+
+.select-all-btn {
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 2px 4px;
+}
+.select-all-btn:hover { text-decoration: underline; }
+
+.note-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.note-group-header {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg2);
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+}
+.note-group-header:first-child {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.note-group-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.note-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 6px 6px;
+  border-radius: 8px;
+  border: 1.5px solid var(--note-unselected-border);
+  background: var(--note-unselected);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, transform 0.08s;
+  min-height: 56px;
+  user-select: none;
+}
+.note-option:hover { border-color: var(--accent); }
+.note-option:active { transform: scale(0.96); }
+.note-option.selected {
+  border-color: var(--note-selected-border);
+  background: var(--note-selected);
+}
+
+.note-name {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--fg2);
+  text-align: center;
+  line-height: 1.3;
+  max-width: 58px;
+  text-wrap: balance;
+}
+
+/* ---- PROGRESS BAR ---- */
+.progress-bar-container {
+  width: 100%;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.05s linear;
+  border-radius: 2px;
+}
+
+/* ---- LOOP COUNT ---- */
+.loop-info {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: var(--fg2);
+  text-align: center;
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 500px) {
+  .settings-row { gap: 12px; }
+  .transport { gap: 8px; }
+  .btn-primary { min-width: 110px; font-size: 13px; }
+  .bpm-display { font-size: 22px; }
+  .note-grid { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0s !important; }
+}
+</style>
+
+<!-- ====== APP ====== -->
+<div class="app-header">
+  <div class="app-title">RHYTHM<span>GEN</span></div>
+  <div class="header-controls">
+    <button class="btn-icon" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">
+      <svg id="themeIcon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 12.5a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<div class="app-body">
+
+  <!-- Rhythm Display -->
+  <div class="rhythm-display" id="rhythmDisplay">
+    <div class="empty-state" id="emptyState">
+      <p>𝄞</p>
+      <p>Press <strong>Randomize</strong> to generate a rhythm</p>
+    </div>
+    <div class="measures-container" id="measuresContainer" hidden></div>
+    <div class="progress-bar-container" id="progressBarContainer" hidden>
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+  </div>
+
+  <!-- Transport -->
+  <div class="transport">
+    <button class="btn btn-secondary" id="randomizeBtn">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M10 2h2v2h-2V2zm0 8h2v2h-2v-2zM2 4h2v6H2V4zm3 0h5v1H5V4zm0 5h5v1H5V9zm3-3h2v2H8V6z"/></svg>
+      Randomize
+    </button>
+    <button class="btn btn-primary" id="playBtn">
+      <svg id="playIcon" width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M3 2l9 5-9 5V2z"/></svg>
+      <span id="playLabel">Play</span>
+    </button>
+    <button class="btn btn-secondary" id="rhythmGuideBtn" title="Play the rhythm sound to guide your practice">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M2 4h3l4-3v12l-4-3H2V4z"/><path d="M10 5a3 3 0 0 1 0 4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/><path d="M11.5 3a5.5 5.5 0 0 1 0 7.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>
+      <span id="rhythmGuideLabel">Guide</span>
+    </button>
+  </div>
+
+  <!-- Settings -->
+  <div class="settings-row">
+    <div class="setting-group">
+      <div class="setting-label">Tempo</div>
+      <div class="setting-control">
+        <input type="range" id="bpmSlider" min="40" max="240" value="90" step="1">
+        <div class="bpm-display" id="bpmDisplay">90</div>
+      </div>
+    </div>
+    <div class="setting-group" style="max-width:110px">
+      <div class="setting-label">Measures</div>
+      <select id="measuresSelect">
+        <option value="1" selected>1 bar</option>
+        <option value="2">2 bars</option>
+        <option value="4">4 bars</option>
+      </select>
+    </div>
+    <div class="setting-group" style="max-width:110px">
+      <div class="setting-label">Time Sig</div>
+      <select id="timeSigSelect">
+        <option value="4" selected>4/4</option>
+        <option value="3">3/4</option>
+        <option value="2">2/4</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">Mutation</div>
+      <div class="setting-control">
+        <input type="range" id="mutationSlider" min="0" max="100" value="0" step="1">
+        <div class="bpm-display" id="mutationDisplay" style="font-size:18px;min-width:44px">0%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Note Selector -->
+  <div class="note-selector-section">
+    <div class="note-selector-header">
+      <span class="section-title">Note Patterns</span>
+      <button class="select-all-btn" id="selectAllBtn">ALL</button>
+    </div>
+    <div class="note-grid" id="noteGrid"></div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+//  RHYTHM GENERATOR — core logic
+// ============================================================
+
+// --- NOTE PATTERN DEFINITIONS ---
+// Each pattern has: id, label, duration (in 16th notes), subdivisions array
+// subdivisions: array of {type: 'note'|'rest', dur16: duration in 16ths}
+// Groups for visual organisation in the selector
+const PATTERN_GROUPS = [
+  { label: '0 notes', ids: ['4r'] },
+  { label: '1 note',  ids: ['4','16r-d8','8r-8','d8r-16'] },
+  { label: '2 notes', ids: ['16-d8','8-8','d8-16','16r-16-8','16r-8-16','8r-16-16'] },
+  { label: '3 notes', ids: ['16-16-8','16-8-16','8-16-16','16r-16-16-16'] },
+  { label: '4 notes', ids: ['16-16-16-16'] },
+  { label: 'Triplets', ids: ['8t-8t-8t','8t-8t-8tr','8t-8tr-8t','8tr-8t-8t','8tr-8t-8tr','8tr-8tr-8t'] },
+];
+
+const PATTERNS = [
+  // 0 notes
+  { id:'4r',    dur16:4, beats:[{t:'r',d:4}],                                        defaultOn:true  },
+  // 1 note
+  { id:'4',         dur16:4, beats:[{t:'n',d:4}],                                        defaultOn:true  },
+  { id:'16r-d8',          dur16:4, beats:[{t:'r',d:1},{t:'n',d:3}],                            defaultOn:true  },
+  { id:'8r-8',            dur16:4, beats:[{t:'r',d:2},{t:'n',d:2}],                            defaultOn:true  },
+  { id:'d8r-16',          dur16:4, beats:[{t:'r',d:3},{t:'n',d:1}],                            defaultOn:true  },
+  // 2 notes
+  { id:'16-d8',           dur16:4, beats:[{t:'n',d:1},{t:'n',d:3}],                            defaultOn:true  },
+  { id:'8-8',             dur16:4, beats:[{t:'n',d:2},{t:'n',d:2}],                            defaultOn:true  },
+  { id:'d8-16',           dur16:4, beats:[{t:'n',d:3},{t:'n',d:1}],                            defaultOn:true  },
+  { id:'16r-16-8',        dur16:4, beats:[{t:'r',d:1},{t:'n',d:1},{t:'n',d:2}],                defaultOn:true  },
+  { id:'16r-8-16',        dur16:4, beats:[{t:'r',d:1},{t:'n',d:2},{t:'n',d:1}],                defaultOn:true  },
+  { id:'8r-16-16',        dur16:4, beats:[{t:'r',d:2},{t:'n',d:1},{t:'n',d:1}],                defaultOn:true  },
+  // 3 notes
+  { id:'16-16-8',         dur16:4, beats:[{t:'n',d:1},{t:'n',d:1},{t:'n',d:2}],               defaultOn:true  },
+  { id:'16-8-16',         dur16:4, beats:[{t:'n',d:1},{t:'n',d:2},{t:'n',d:1}],               defaultOn:true  },
+  { id:'8-16-16',         dur16:4, beats:[{t:'n',d:2},{t:'n',d:1},{t:'n',d:1}],               defaultOn:true  },
+  { id:'16r-16-16-16',    dur16:4, beats:[{t:'r',d:1},{t:'n',d:1},{t:'n',d:1},{t:'n',d:1}],  defaultOn:true  },
+  // 4 notes
+  { id:'16-16-16-16',     dur16:4, beats:[{t:'n',d:1},{t:'n',d:1},{t:'n',d:1},{t:'n',d:1}],  defaultOn:true  },
+  // Triplets
+  { id:'8t-8t-8t',         dur16:4, beats:[{t:'n',d:1.33},{t:'n',d:1.33},{t:'n',d:1.33}],      isTriplet:true, defaultOn:true  },
+  { id:'8t-8t-8tr',       dur16:4, beats:[{t:'n',d:1.33},{t:'n',d:1.33},{t:'r',d:1.33}],      isTriplet:true, defaultOn:false },
+  { id:'8t-8tr-8t',      dur16:4, beats:[{t:'n',d:1.33},{t:'r',d:1.33},{t:'n',d:1.33}],      isTriplet:true, defaultOn:false },
+  { id:'8tr-8t-8t',      dur16:4, beats:[{t:'r',d:1.33},{t:'n',d:1.33},{t:'n',d:1.33}],      isTriplet:true, defaultOn:false },
+  { id:'8tr-8t-8tr',    dur16:4, beats:[{t:'r',d:1.33},{t:'n',d:1.33},{t:'r',d:1.33}],      isTriplet:true, defaultOn:false },
+  { id:'8tr-8tr-8t',    dur16:4, beats:[{t:'r',d:1.33},{t:'r',d:1.33},{t:'n',d:1.33}],      isTriplet:true, defaultOn:false },
+];
+
+// --- STATE ---
+let rhythmGuideOn = false;
+let mutationProb = 0; // 0–1, probability a beat mutates after it plays
+let mutatedThisLoop = new Set(); // flat indices that already mutated in the current loop pass
+let frozenBeats = new Set(); // set of "mIdx-bIdx" keys for beats the user has locked
+let selectedPatterns = new Set(PATTERNS.filter(p => p.defaultOn).map(p => p.id));
+// keep PATTERNS accessible by id
+const PATTERN_MAP = Object.fromEntries(PATTERNS.map(p => [p.id, p]));
+let currentRhythm = []; // array of measures, each measure = array of beat groups
+let isPlaying = false;
+let audioCtx = null;
+let schedulerTimer = null;
+let nextNoteTime = 0;
+let currentBeatIndex = 0; // global beat index across all measures/beats
+let allBeats = []; // flat array of {measureIdx, beatIdx, time, dur, pattern}
+let playStartTime = 0;
+let loopCount = 0;
+let totalBeats = 0;
+let activeBeatEl = null;
+
+// --- UI ELEMENTS ---
+const bpmSlider = document.getElementById('bpmSlider');
+const bpmDisplay = document.getElementById('bpmDisplay');
+const playBtn = document.getElementById('playBtn');
+const playLabel = document.getElementById('playLabel');
+const playIcon = document.getElementById('playIcon');
+const randomizeBtn = document.getElementById('randomizeBtn');
+const measuresContainer = document.getElementById('measuresContainer');
+const emptyState = document.getElementById('emptyState');
+const progressBar = document.getElementById('progressBar');
+const progressBarContainer = document.getElementById('progressBarContainer');
+const noteGrid = document.getElementById('noteGrid');
+const selectAllBtn = document.getElementById('selectAllBtn');
+const themeToggle = document.getElementById('themeToggle');
+const themeIcon = document.getElementById('themeIcon');
+
+// --- THEME ---
+let isDark = false;
+function applyTheme(dark) {
+  isDark = dark;
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  themeIcon.innerHTML = dark
+    ? '<path d="M8 3a5 5 0 1 0 0 10A5 5 0 0 0 8 3zm0 8.5A3.5 3.5 0 1 1 8 4.5a3.5 3.5 0 0 1 0 7z"/>'
+    : '<path d="M2 8a6 6 0 1 1 12 0A6 6 0 0 1 2 8z"/>';
+}
+themeToggle.addEventListener('click', () => applyTheme(!isDark));
+
+// ============================================================
+//  NOTE SVG LIBRARY
+//  All paths derived from the original site's style:
+//  filled paths, 200×130 viewBox proportions, scaled down.
+//  Each function returns an SVG string. currentColor fills.
+// ============================================================
+
+// Shared viewBox: 200×130. We display at 40×26 (scale 0.2).
+const NW = 68, NH = 44; // display size for single notes in the rhythm bar
+const SVW = 200, SVH = 130; // original viewBox
+
+// ---- BUILD SVG SHELL ----
+function svg(w, h, vw, vh, inner) {
+  return `<svg class="note-svg" width="${w}" height="${h}" viewBox="0 0 ${vw} ${vh}" fill="currentColor">${inner}</svg>`;
+}
+
+// ---- INDIVIDUAL PATTERN SVGS ----
+// All use viewBox 0 0 200 130 (or multiples wide for multi-note patterns)
+// Stem top ~30, notehead bottom ~100
+
+function svg_4r() {
+  const inner = `
+  <path d="m97.01,30.13l14.98,18.26c-3.12,3.68-5.52,6.87-7.21,9.55-1.69,2.68-2.53,5.4-2.53,8.14,0,2.31.75,4.73,2.25,7.25,1.5,2.53,3.87,5.73,7.11,9.6l-1.5,2.06c-2.75-1.75-5.31-2.62-7.68-2.62-1.75,0-3.06.58-3.93,1.73-.87,1.16-1.31,2.54-1.31,4.17,0,2,.42,3.89,1.26,5.66.84,1.78,1.98,3.48,3.42,5.1l-1.22,1.78c-4.31-3.12-7.49-5.96-9.55-8.52-2.06-2.56-3.09-5.34-3.09-8.33,0-2.68.84-4.65,2.53-5.9,1.69-1.25,3.71-1.87,6.09-1.87,1.87,0,4.31.72,7.3,2.15v-.19l-14.42-19.19c6.3-5.55,9.46-10.73,9.46-15.54,0-3.81-2-8.24-5.99-13.29h4.03Z"/>
+  `;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_4() {
+  const inner = `
+  <path d="m110.59,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  `;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_16r_d8() {
+  const inner = `
+  <path d="m110.47,29.67h1.84c.28,1.94.64,3.65,1.06,5.13.43,1.49,1.04,2.93,1.84,4.32.8,1.39,1.86,2.89,3.19,4.5,1.42,1.65,2.59,3.03,3.54,4.14.94,1.11,1.89,2.28,2.83,3.51,1.75,2.17,3.03,4.4,3.86,6.69.83,2.29,1.24,4.61,1.24,6.97,0,4.91-2.08,10.86-6.23,17.84h-1.13c1.32-2.78,2.51-5.58,3.58-8.39,1.06-2.81,1.59-5.49,1.59-8.04s-.66-5.17-1.98-7.86-3.18-4.96-5.56-6.8c-2.38-1.84-4.99-2.86-7.82-3.04v40.08c0,2.03-.65,3.93-1.95,5.7s-3.01,3.2-5.13,4.28c-2.12,1.09-4.46,1.63-7.01,1.63-2.03,0-3.74-.52-5.14-1.56-1.39-1.04-2.09-2.57-2.09-4.6,0-1.51.4-2.96,1.2-4.35.8-1.39,1.86-2.63,3.19-3.72,1.32-1.08,2.77-1.94,4.35-2.55,1.58-.61,3.17-.92,4.78-.92,2.74,0,4.72.54,5.95,1.63V29.67Z"/>
+  <path d="m134.14,91.53c1.25,0,2.29.45,3.14,1.36.84.91,1.26,1.92,1.26,3.04s-.42,2.14-1.26,3.04c-.84.91-1.89,1.36-3.14,1.36s-2.29-.45-3.14-1.36c-.84-.9-1.26-1.92-1.26-3.04s.42-2.14,1.26-3.04c.84-.9,1.89-1.36,3.14-1.36Z"/>
+  <path d="m68.89,98.6l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91s-2.49.57-3.72.57c-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.46-2.44,1.38-3.36.92-.92,2.13-1.38,3.65-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,1.94,0,3.78-1.09,5.52-3.26l3.68-13.45c-.99.9-2.11,1.53-3.36,1.91s-2.49.57-3.72.57c-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38s2.55.45,3.4,1.35c.85.9,1.27,2.05,1.27,3.47,0,.47-.07.96-.21,1.45-.14.5-.31.93-.5,1.31,0,.28.28.43.85.43,2.6,0,5.07-2.03,7.44-6.09h1.27l-13.38,48.01h-2.55Z"/>
+  <path d="m112.04,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  `;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_8r_8() {
+  const inner = `
+  <path d="m65.64,82.07l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91-1.25.38-2.49.57-3.72.57-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,2.59,0,5.07-2.03,7.43-6.09h1.28l-8.57,30.73h-2.55Z"/>
+  <path d="m122.9,31.16h1.79c.28,1.9.62,3.57,1.03,5.03.41,1.45,1.01,2.87,1.79,4.23.78,1.36,1.81,2.83,3.1,4.4,1.38,1.62,2.53,2.97,3.45,4.05.92,1.09,1.84,2.23,2.76,3.43,1.7,2.13,2.95,4.31,3.76,6.55.8,2.24,1.21,4.52,1.21,6.83,0,4.81-2.02,10.63-6.07,17.47h-1.1c1.29-2.73,2.45-5.46,3.48-8.21,1.03-2.75,1.55-5.37,1.55-7.87s-.65-5.06-1.93-7.69-3.09-4.85-5.41-6.65c-2.32-1.8-4.86-2.8-7.62-2.98v39.23c0,1.99-.63,3.85-1.9,5.58s-2.93,3.13-5,4.19c-2.07,1.06-4.34,1.59-6.83,1.59-1.98,0-3.64-.51-5-1.53-1.36-1.02-2.03-2.52-2.03-4.51,0-1.48.39-2.9,1.17-4.26.78-1.36,1.81-2.58,3.1-3.64,1.29-1.06,2.7-1.89,4.24-2.5,1.54-.6,3.09-.9,4.66-.9,2.67,0,4.6.53,5.79,1.59V31.16Z"/>
+  `;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_d8r_16() {
+  const inner = `
+  <path d="m137.02,29.67h1.84c.14,1.37.35,2.57.64,3.61.28,1.04.66,1.96,1.13,2.76.8,1.27,1.77,2.37,2.9,3.29,1.13.92,2.43,2.11,3.89,3.58,1.42,1.37,2.81,2.89,4.18,4.57,1.37,1.68,2.51,3.58,3.43,5.7.92,2.12,1.38,4.51,1.38,7.15,0,2.12-.33,4.44-.99,6.94,1.23,1.79,1.84,4.39,1.84,7.79,0,2.27-.31,4.52-.92,6.76-.61,2.24-1.51,4.17-2.69,5.77h-1.13c2.22-4.34,3.33-8.12,3.33-11.33,0-2.6-.73-4.98-2.2-7.15-.94-1.42-1.99-2.68-3.15-3.79-1.16-1.11-2.63-2.25-4.42-3.43-1.79-1.18-4.2-2.52-7.22-4.04v31.16c0,2.03-.67,3.91-2.02,5.63-1.35,1.72-3.08,3.1-5.2,4.14-2.12,1.04-4.32,1.56-6.59,1.56-1.98,0-3.68-.45-5.1-1.35s-2.12-2.29-2.12-4.18c0-2.27.68-4.32,2.05-6.16,1.37-1.84,3.14-3.32,5.31-4.43,2.17-1.11,4.41-1.66,6.73-1.66,2.12,0,3.82.57,5.1,1.7V29.67Zm2.27,13.17c0,2.46.54,4.72,1.63,6.8.38.66,1.14,1.72,2.3,3.19,1.16,1.46,2.54,2.95,4.14,4.46,1.79,1.7,3.38,3.33,4.74,4.89,1.37,1.56,2.17,2.62,2.41,3.19.09-.38.16-.81.21-1.31.05-.5.07-1.05.07-1.66,0-3.59-1.16-6.96-3.47-10.13-2.31-3.16-6.33-6.3-12.04-9.42Z"/>
+  <path d="m50.17,81.32l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91-1.25.38-2.49.57-3.72.57-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,2.59,0,5.07-2.03,7.43-6.09h1.28l-8.57,30.73h-2.55Z"/>
+  <path d="m74.25,49.69c1.25,0,2.29.45,3.14,1.36.84.91,1.26,1.92,1.26,3.04s-.42,2.14-1.26,3.04c-.84.91-1.89,1.36-3.14,1.36s-2.29-.45-3.14-1.36c-.84-.9-1.26-1.92-1.26-3.04s.42-2.14,1.26-3.04c.84-.9,1.89-1.36,3.14-1.36Z"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_16_d8() {
+  const inner = `
+  <g>
+    <path d="m74.89,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <path d="m129.68,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <rect x="73.05" y="29.67" width="56.64" height="5.53"/>
+  </g>
+  <path d="m141.88,91.53c1.25,0,2.29.45,3.14,1.36.84.91,1.26,1.92,1.26,3.04s-.42,2.14-1.26,3.04c-.84.91-1.89,1.36-3.14,1.36s-2.29-.45-3.14-1.36c-.84-.9-1.26-1.92-1.26-3.04s.42-2.14,1.26-3.04c.84-.9,1.89-1.36,3.14-1.36Z"/>
+  <rect x="73.05" y="40.73" width="28.32" height="5.53"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_8_8() {
+  const inner = `
+  <path d="m83.19,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <path d="m137.98,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <rect x="81.35" y="29.67" width="56.64" height="5.53"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_d8_16() {
+  const inner = `
+  <g>
+    <g>
+      <path d="m69.03,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+      <rect x="67.19" y="29.67" width="56.64" height="5.53"/>
+    </g>
+    <path d="m152.14,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <rect x="123.82" y="29.67" width="28.32" height="5.53"/>
+    <rect x="123.82" y="40.73" width="28.32" height="5.53"/>
+  </g>
+  <path d="m80.84,91.53c1.25,0,2.29.45,3.14,1.36.84.91,1.26,1.92,1.26,3.04s-.42,2.14-1.26,3.04c-.84.91-1.89,1.36-3.14,1.36s-2.29-.45-3.14-1.36c-.84-.9-1.26-1.92-1.26-3.04s.42-2.14,1.26-3.04c.84-.9,1.89-1.36,3.14-1.36Z"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_16r_16_8() {
+  const inner = `
+  <g>
+    <path d="m98.41,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <path d="m153.2,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <rect x="96.57" y="29.67" width="56.64" height="5.53"/>
+  </g>
+  <path d="m54.23,98.6l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91s-2.49.57-3.72.57c-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.46-2.44,1.38-3.36.92-.92,2.13-1.38,3.65-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,1.94,0,3.78-1.09,5.52-3.26l3.68-13.45c-.99.9-2.11,1.53-3.36,1.91s-2.49.57-3.72.57c-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38s2.55.45,3.4,1.35c.85.9,1.27,2.05,1.27,3.47,0,.47-.07.96-.21,1.45-.14.5-.31.93-.5,1.31,0,.28.28.43.85.43,2.6,0,5.07-2.03,7.44-6.09h1.27l-13.38,48.01h-2.55Z"/>
+  <rect x="96.57" y="40.73" width="28.32" height="5.53"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_16r_8_16() {
+  const inner = `
+  <path d="m44.48,98.6l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91s-2.49.57-3.72.57c-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.46-2.44,1.38-3.36.92-.92,2.13-1.38,3.65-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,1.94,0,3.78-1.09,5.52-3.26l3.68-13.45c-.99.9-2.11,1.53-3.36,1.91s-2.49.57-3.72.57c-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38s2.55.45,3.4,1.35c.85.9,1.27,2.05,1.27,3.47,0,.47-.07.96-.21,1.45-.14.5-.31.93-.5,1.31,0,.28.28.43.85.43,2.6,0,5.07-2.03,7.44-6.09h1.27l-13.38,48.01h-2.55Z"/>
+  <g>
+    <path d="m88.47,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <path d="m162.96,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <rect x="87.84" y="29.67" width="75.12" height="5.53"/>
+    <rect x="134.64" y="40.73" width="28.32" height="5.53"/>
+  </g>`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_8r_16_16() {
+  const inner = `
+  <g>
+    <path d="m118.8,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <path d="m147.12,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21-2.13,1.06-4.37,1.59-6.73,1.59-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <rect x="118.8" y="29.67" width="28.32" height="5.53"/>
+    <rect x="117.91" y="40.73" width="28.32" height="5.53"/>
+  </g>
+  <path d="m60.32,81.32l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91-1.25.38-2.49.57-3.72.57-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,2.59,0,5.07-2.03,7.43-6.09h1.28l-8.57,30.73h-2.55Z"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_16_16_8() {
+  const inner = `
+  <path d="m110.58,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <path d="m138.9,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <rect x="110.58" y="29.67" width="28.32" height="5.53"/>
+  <path d="m82.27,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <rect x="80.44" y="29.67" width="28.32" height="5.53"/>
+  <rect x="80.44" y="40.73" width="28.32" height="5.53"/>
+  `;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_16_8_16() {
+  const inner = `
+    <g>
+    <path d="m45.95,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <path d="m100.74,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <rect x="44.1" y="29.67" width="56.64" height="5.53"/>
+  </g>
+  <g>
+    <path d="m175.23,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <rect x="100.1" y="29.67" width="75.12" height="5.53"/>
+  </g>
+  <rect x="44.14" y="40.73" width="28.32" height="5.53"/>
+  <rect x="146.91" y="40.73" width="28.32" height="5.53"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_8_16_16() {
+  const inner = `
+    <g>
+    <path d="m69.03,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <path d="m123.82,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+    <rect x="67.19" y="29.67" width="56.64" height="5.53"/>
+  </g>
+  <path d="m152.14,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <rect x="123.82" y="29.67" width="28.32" height="5.53"/>
+  <rect x="123.82" y="40.73" width="28.32" height="5.53"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_16r_16_16_16() {
+  const inner = `
+  <path d="m84.14,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <rect x="82.3" y="29.67" width="56.64" height="5.53"/>
+  <path d="m167.25,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <rect x="138.94" y="29.67" width="28.32" height="5.53"/>
+  <rect x="82.3" y="40.73" width="56.64" height="5.53"/>
+  <rect x="138.94" y="40.73" width="28.32" height="5.53"/>
+  <path d="m125.7,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <path d="m40.18,98.6l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91s-2.49.57-3.72.57c-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.46-2.44,1.38-3.36.92-.92,2.13-1.38,3.65-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,1.94,0,3.78-1.09,5.52-3.26l3.68-13.45c-.99.9-2.11,1.53-3.36,1.91s-2.49.57-3.72.57c-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38s2.55.45,3.4,1.35c.85.9,1.27,2.05,1.27,3.47,0,.47-.07.96-.21,1.45-.14.5-.31.93-.5,1.31,0,.28.28.43.85.43,2.6,0,5.07-2.03,7.44-6.09h1.27l-13.38,48.01h-2.55Z"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_16_16_16_16() {
+  const inner = `
+  <path d="m124.75,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21-2.13,1.06-4.37,1.59-6.73,1.59-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <path d="m153.06,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <rect x="124.75" y="29.67" width="28.32" height="5.53"/>
+  <rect x="124.75" y="40.73" width="28.32" height="5.53"/>
+  <path d="m96.43,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <rect x="96.43" y="29.67" width="28.32" height="5.53"/>
+  <rect x="96.43" y="40.73" width="28.32" height="5.53"/>
+  <path d="m68.11,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <rect x="68.11" y="29.67" width="28.32" height="5.53"/>
+  <rect x="68.11" y="40.73" width="28.32" height="5.53"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_8t_8t_8t() {
+  const inner = `
+  <defs>
+  <style>
+    .cls-1 {
+      fill: none;
+      stroke: #000;
+      stroke-miterlimit: 10;
+      stroke-width: 1.2px;
+    }
+  </style>
+  </defs>
+  <path d="m64.76,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <rect x="62.92" y="29.67" width="56.64" height="5.53"/>
+  <path d="m147.87,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  <rect x="119.56" y="29.67" width="28.32" height="5.53"/>
+  <path d="m108.29,9.44c0,.72-.2,1.29-.6,1.71-.4.42-.93.7-1.61.84v.06c.86.1,1.49.37,1.91.81.42.44.63,1.01.63,1.72,0,.62-.14,1.17-.43,1.65-.29.48-.73.86-1.34,1.13-.6.27-1.38.4-2.32.4-.56,0-1.07-.04-1.55-.13s-.93-.24-1.37-.46v-1.22c.45.22.93.39,1.45.51.52.12,1.01.19,1.49.19.96,0,1.64-.19,2.07-.56.42-.37.63-.89.63-1.54s-.26-1.15-.78-1.44c-.52-.29-1.26-.44-2.2-.44h-1.03v-1.12h1.04c.87,0,1.54-.18,1.99-.55.45-.37.68-.86.68-1.46,0-.52-.17-.92-.52-1.2-.35-.28-.82-.43-1.42-.43s-1.07.08-1.48.25c-.41.17-.81.38-1.21.64l-.66-.9c.38-.3.85-.56,1.41-.78.56-.22,1.2-.33,1.92-.33,1.11,0,1.94.25,2.48.75.54.5.81,1.13.81,1.89Z"/>
+  <polyline class="cls-1" points="54.53 20.11 54.53 12.27 98.46 12.27"/>
+  <polyline class="cls-1" points="156.41 20.11 156.41 12.27 112.49 12.27"/>
+  <path d="m106.32,29.67v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21-2.13,1.06-4.37,1.59-6.73,1.59-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77V29.67h1.84Z"/>
+  `;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_8t_8t_8tr() {
+  const inner = `
+  <defs>
+    <style>
+      .cls-1 {
+        fill: none;
+        stroke: #000;
+        stroke-miterlimit: 10;
+        stroke-width: 1.2px;
+      }
+    </style>
+  </defs>
+  <path d="m145.21,92.76l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91-1.25.38-2.49.57-3.72.57-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,2.59,0,5.07-2.03,7.43-6.09h1.28l-8.57,30.73h-2.55Z"/>
+  <path d="m64.76,41.1v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77v-54.74h1.84Z"/>
+  <rect x="62.92" y="41.1" width="43.4" height="5.53"/>
+  <path d="m108.29,20.87c0,.72-.2,1.29-.6,1.71-.4.42-.93.7-1.61.84v.06c.86.1,1.49.37,1.91.81.42.44.63,1.01.63,1.72,0,.62-.14,1.17-.43,1.65-.29.48-.73.86-1.34,1.13-.6.27-1.38.4-2.32.4-.56,0-1.07-.04-1.55-.13s-.93-.24-1.37-.46v-1.22c.45.22.93.39,1.45.51.52.12,1.01.19,1.49.19.96,0,1.64-.19,2.07-.56.42-.37.63-.89.63-1.54s-.26-1.15-.78-1.44c-.52-.29-1.26-.44-2.2-.44h-1.03v-1.12h1.04c.87,0,1.54-.18,1.99-.55.45-.37.68-.86.68-1.46,0-.52-.17-.92-.52-1.2-.35-.28-.82-.43-1.42-.43s-1.07.08-1.48.25c-.41.17-.81.38-1.21.64l-.66-.9c.38-.3.85-.56,1.41-.78.56-.22,1.2-.33,1.92-.33,1.11,0,1.94.25,2.48.75.54.5.81,1.13.81,1.89Z"/>
+  <polyline class="cls-1" points="54.53 31.54 54.53 23.71 98.46 23.71"/>
+  <polyline class="cls-1" points="156.41 31.54 156.41 23.71 112.49 23.71"/>
+  <path d="m106.32,41.1v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77v-54.74h1.84Z"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_8t_8tr_8t() {
+  const inner = `
+  <defs>
+    <style>
+      .cls-1 {
+        fill: none;
+        stroke: #000;
+        stroke-miterlimit: 10;
+        stroke-width: 1.2px;
+      }
+    </style>
+  </defs>
+  <polyline class="cls-1" points="54.53 31.54 54.53 23.71 98.46 23.71"/>
+  <polyline class="cls-1" points="156.41 31.54 156.41 23.71 112.49 23.71"/>
+  <path d="m64.76,41.1v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77v-54.74h1.84Z"/>
+  <rect x="62.92" y="41.1" width="56.64" height="5.53"/>
+  <g>
+    <path d="m96.62,109.08l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91-1.25.38-2.49.57-3.72.57-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,2.59,0,5.07-2.03,7.43-6.09h1.28l-8.57,30.73h-2.55Z"/>
+    <path d="m147.87,41.1v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77v-54.74h1.84Z"/>
+  </g>
+  <rect x="119.56" y="41.1" width="28.32" height="5.53"/>
+  <path d="m108.29,20.87c0,.72-.2,1.29-.6,1.71-.4.42-.93.7-1.61.84v.06c.86.1,1.49.37,1.91.81.42.44.63,1.01.63,1.72,0,.62-.14,1.17-.43,1.65-.29.48-.73.86-1.34,1.13-.6.27-1.38.4-2.32.4-.56,0-1.07-.04-1.55-.13s-.93-.24-1.37-.46v-1.22c.45.22.93.39,1.45.51.52.12,1.01.19,1.49.19.96,0,1.64-.19,2.07-.56.42-.37.63-.89.63-1.54s-.26-1.15-.78-1.44c-.52-.29-1.26-.44-2.2-.44h-1.03v-1.12h1.04c.87,0,1.54-.18,1.99-.55.45-.37.68-.86.68-1.46,0-.52-.17-.92-.52-1.2-.35-.28-.82-.43-1.42-.43s-1.07.08-1.48.25c-.41.17-.81.38-1.21.64l-.66-.9c.38-.3.85-.56,1.41-.78.56-.22,1.2-.33,1.92-.33,1.11,0,1.94.25,2.48.75.54.5.81,1.13.81,1.89Z"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_8tr_8t_8t() {
+  const inner = `
+  <defs>
+    <style>
+      .cls-1 {
+        fill: none;
+        stroke: #000;
+        stroke-miterlimit: 10;
+        stroke-width: 1.2px;
+      }
+    </style>
+  </defs>
+  <path d="m56.58,92.76l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91-1.25.38-2.49.57-3.72.57-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,2.59,0,5.07-2.03,7.43-6.09h1.28l-8.57,30.73h-2.55Z"/>
+  <path d="m102.81,20.87c0,.72-.2,1.29-.6,1.71-.4.42-.93.7-1.61.84v.06c.86.1,1.49.37,1.91.81.42.44.63,1.01.63,1.72,0,.62-.14,1.17-.43,1.65-.29.48-.73.86-1.34,1.13-.6.27-1.38.4-2.32.4-.56,0-1.07-.04-1.55-.13s-.93-.24-1.37-.46v-1.22c.45.22.93.39,1.45.51.52.12,1.01.19,1.49.19.96,0,1.64-.19,2.07-.56.42-.37.63-.89.63-1.54s-.26-1.15-.78-1.44c-.52-.29-1.26-.44-2.2-.44h-1.03v-1.12h1.04c.87,0,1.54-.18,1.99-.55.45-.37.68-.86.68-1.46,0-.52-.17-.92-.52-1.2-.35-.28-.82-.43-1.42-.43s-1.07.08-1.48.25c-.41.17-.81.38-1.21.64l-.66-.9c.38-.3.85-.56,1.41-.78.56-.22,1.2-.33,1.92-.33,1.11,0,1.94.25,2.48.75.54.5.81,1.13.81,1.89Z"/>
+  <polyline class="cls-1" points="49.06 31.54 49.06 23.71 92.98 23.71"/>
+  <polyline class="cls-1" points="150.94 31.54 150.94 23.71 107.02 23.71"/>
+  <g>
+    <path d="m100.91,41.1v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77v-54.74h1.84Z"/>
+    <rect x="99.07" y="41.1" width="43.4" height="5.53"/>
+    <path d="m142.46,41.1v59.2c0,2.03-.67,3.92-2.02,5.66-1.35,1.75-3.08,3.15-5.2,4.21s-4.37,1.59-6.73,1.59c-2.17,0-3.92-.55-5.24-1.66-1.32-1.11-1.98-2.61-1.98-4.5,0-1.46.43-2.88,1.27-4.25.85-1.37,1.97-2.61,3.36-3.72,1.39-1.11,2.91-1.98,4.57-2.62,1.65-.64,3.28-.96,4.89-.96,2.03,0,3.78.59,5.24,1.77v-54.74h1.84Z"/>
+  </g>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+
+function svg_8tr_8t_8tr() {
+  const inner = `
+  <defs>
+    <style>
+      .cls-1 {
+        fill: none;
+        stroke: #000;
+        stroke-miterlimit: 10;
+        stroke-width: 1.2px;
+      }
+    </style>
+  </defs>
+  <path d="m138.74,92.76l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91-1.25.38-2.49.57-3.72.57-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,2.59,0,5.07-2.03,7.43-6.09h1.28l-8.57,30.73h-2.55Z"/>
+  <path d="m56.58,92.76l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91-1.25.38-2.49.57-3.72.57-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,2.59,0,5.07-2.03,7.43-6.09h1.28l-8.57,30.73h-2.55Z"/>
+  <path d="m102.81,20.87c0,.72-.2,1.29-.6,1.71-.4.42-.93.7-1.61.84v.06c.86.1,1.49.37,1.91.81.42.44.63,1.01.63,1.72,0,.62-.14,1.17-.43,1.65-.29.48-.73.86-1.34,1.13-.6.27-1.38.4-2.32.4-.56,0-1.07-.04-1.55-.13s-.93-.24-1.37-.46v-1.22c.45.22.93.39,1.45.51.52.12,1.01.19,1.49.19.96,0,1.64-.19,2.07-.56.42-.37.63-.89.63-1.54s-.26-1.15-.78-1.44c-.52-.29-1.26-.44-2.2-.44h-1.03v-1.12h1.04c.87,0,1.54-.18,1.99-.55.45-.37.68-.86.68-1.46,0-.52-.17-.92-.52-1.2-.35-.28-.82-.43-1.42-.43s-1.07.08-1.48.25c-.41.17-.81.38-1.21.64l-.66-.9c.38-.3.85-.56,1.41-.78.56-.22,1.2-.33,1.92-.33,1.11,0,1.94.25,2.48.75.54.5.81,1.13.81,1.89Z"/>
+  <polyline class="cls-1" points="49.06 31.54 49.06 23.71 92.98 23.71"/>
+  <polyline class="cls-1" points="150.94 31.54 150.94 23.71 107.02 23.71"/>
+  <path d="m98.6,42.6h1.79c.28,1.9.62,3.57,1.03,5.03.41,1.45,1.01,2.87,1.79,4.23.78,1.36,1.81,2.83,3.1,4.4,1.38,1.62,2.53,2.97,3.45,4.05.92,1.09,1.84,2.23,2.76,3.43,1.7,2.13,2.95,4.31,3.76,6.55.8,2.24,1.21,4.52,1.21,6.83,0,4.81-2.02,10.63-6.07,17.47h-1.1c1.29-2.73,2.45-5.46,3.48-8.21,1.03-2.75,1.55-5.37,1.55-7.87s-.65-5.06-1.93-7.69-3.09-4.85-5.41-6.65c-2.32-1.8-4.86-2.8-7.62-2.98v39.23c0,1.99-.63,3.85-1.9,5.58s-2.93,3.13-5,4.19c-2.07,1.06-4.34,1.59-6.83,1.59-1.98,0-3.64-.51-5-1.53-1.36-1.02-2.03-2.52-2.03-4.51,0-1.48.39-2.9,1.17-4.26.78-1.36,1.81-2.58,3.1-3.64,1.29-1.06,2.7-1.89,4.24-2.5,1.54-.6,3.09-.9,4.66-.9,2.67,0,4.6.53,5.79,1.59v-53.44Z"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+function svg_8tr_8tr_8t() {
+  const inner = `
+  <defs>
+    <style>
+      .cls-1 {
+        fill: none;
+        stroke: #000;
+        stroke-miterlimit: 10;
+        stroke-width: 1.2px;
+      }
+    </style>
+  </defs>
+  <path d="m97.02,92.76l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91-1.25.38-2.49.57-3.72.57-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,2.59,0,5.07-2.03,7.43-6.09h1.28l-8.57,30.73h-2.55Z"/>
+  <path d="m52.29,92.76l6.8-24.08c-.99.9-2.11,1.53-3.36,1.91-1.25.38-2.49.57-3.72.57-2.03,0-3.73-.54-5.1-1.63-1.37-1.08-2.05-2.64-2.05-4.67,0-1.32.47-2.44,1.42-3.36.94-.92,2.15-1.38,3.61-1.38,1.37,0,2.49.44,3.36,1.31.87.87,1.31,2.04,1.31,3.5,0,1.04-.24,1.96-.71,2.76,0,.28.28.43.85.43,2.59,0,5.07-2.03,7.43-6.09h1.28l-8.57,30.73h-2.55Z"/>
+  <path d="m98.53,20.87c0,.72-.2,1.29-.6,1.71-.4.42-.93.7-1.61.84v.06c.86.1,1.49.37,1.91.81.42.44.63,1.01.63,1.72,0,.62-.14,1.17-.43,1.65-.29.48-.73.86-1.34,1.13-.6.27-1.38.4-2.32.4-.56,0-1.07-.04-1.55-.13s-.93-.24-1.37-.46v-1.22c.45.22.93.39,1.45.51.52.12,1.01.19,1.49.19.96,0,1.64-.19,2.07-.56.42-.37.63-.89.63-1.54s-.26-1.15-.78-1.44c-.52-.29-1.26-.44-2.2-.44h-1.03v-1.12h1.04c.87,0,1.54-.18,1.99-.55.45-.37.68-.86.68-1.46,0-.52-.17-.92-.52-1.2-.35-.28-.82-.43-1.42-.43s-1.07.08-1.48.25c-.41.17-.81.38-1.21.64l-.66-.9c.38-.3.85-.56,1.41-.78.56-.22,1.2-.33,1.92-.33,1.11,0,1.94.25,2.48.75.54.5.81,1.13.81,1.89Z"/>
+  <polyline class="cls-1" points="44.77 31.54 44.77 23.71 88.7 23.71"/>
+  <polyline class="cls-1" points="146.65 31.54 146.65 23.71 102.73 23.71"/>
+  <path d="m136.33,42.6h1.79c.28,1.9.62,3.57,1.03,5.03.41,1.45,1.01,2.87,1.79,4.23.78,1.36,1.81,2.83,3.1,4.4,1.38,1.62,2.53,2.97,3.45,4.05.92,1.09,1.84,2.23,2.76,3.43,1.7,2.13,2.95,4.31,3.76,6.55.8,2.24,1.21,4.52,1.21,6.83,0,4.81-2.02,10.63-6.07,17.47h-1.1c1.29-2.73,2.45-5.46,3.48-8.21,1.03-2.75,1.55-5.37,1.55-7.87s-.65-5.06-1.93-7.69c-1.29-2.63-3.09-4.85-5.41-6.65-2.32-1.8-4.86-2.8-7.62-2.98v39.23c0,1.99-.63,3.85-1.9,5.58s-2.93,3.13-5,4.19c-2.07,1.06-4.34,1.59-6.83,1.59-1.98,0-3.64-.51-5-1.53-1.36-1.02-2.03-2.52-2.03-4.51,0-1.48.39-2.9,1.17-4.26.78-1.36,1.81-2.58,3.1-3.64,1.29-1.06,2.7-1.89,4.24-2.5,1.54-.6,3.09-.9,4.66-.9,2.67,0,4.6.53,5.79,1.59v-53.44Z"/>
+`;
+  return svg(NW, NH, SVW, SVH, inner);
+}
+
+// ---- MULTI-NOTE PATTERNS ----
+// Layout: evenly space notes in a wider viewBox, beam across when needed
+
+function svgPattern(id) {
+  switch(id) {
+    // 0 notes
+    case '4r': return svg_4r();
+
+    // 1 note
+    case '4': return svg_4();
+    case '16r-d8':  return svg_16r_d8();
+    case '8r-8':    return svg_8r_8();
+    case 'd8r-16':  return svg_d8r_16();
+
+    // 2 notes
+    case '16-d8':      return svg_16_d8();
+    case '8-8':        return svg_8_8();
+    case 'd8-16':      return svg_d8_16();
+    case '16r-16-8':   return svg_16r_16_8();
+    case '16r-8-16':   return svg_16r_8_16();
+    case '8r-16-16':   return svg_8r_16_16();
+
+    // 3 notes
+    case '16-16-8':    return svg_16_16_8();
+    case '16-8-16':    return svg_16_8_16();
+    case '8-16-16':    return svg_8_16_16();
+    case '16r-16-16-16':return svg_16r_16_16_16();
+
+    // 4 notes
+    case '16-16-16-16': return svg_16_16_16_16();
+
+    // Triplets
+    case '8t-8t-8t':    return svg_8t_8t_8t();
+    case '8t-8t-8tr':  return svg_8t_8t_8tr();
+    case '8t-8tr-8t': return svg_8t_8tr_8t();
+    case '8tr-8t-8t':  return svg_8tr_8t_8t();
+    case '8tr-8t-8tr': return svg_8tr_8t_8tr();
+    case '8tr-8tr-8t': return svg_8tr_8tr_8t();
+
+    default: return `<svg class="note-svg" width="${NW}" height="${NH}" viewBox="0 0 ${SVW} ${SVH}"></svg>`;
+  }
+}
+
+
+// ---- PUBLIC RENDER FUNCTIONS ----
+// Used by the rhythm display and the selector
+function renderNoteOption(pattern) {
+  return svgPattern(pattern.id);
+}
+
+// For the rhythm bar display (same SVGs, slightly taller container)
+function renderBeatGroup(pattern) {
+  return svgPattern(pattern.id);
+}
+
+// --- BUILD NOTE GRID ---
+function buildNoteGrid() {
+  noteGrid.innerHTML = '';
+
+  PATTERN_GROUPS.forEach(group => {
+    // Group header
+    const header = document.createElement('div');
+    header.className = 'note-group-header';
+    header.textContent = group.label;
+    noteGrid.appendChild(header);
+
+    // Row for this group
+    const row = document.createElement('div');
+    row.className = 'note-group-row';
+
+    group.ids.forEach(id => {
+      const p = PATTERNS.find(x => x.id === id);
+      if (!p) return;
+      const el = document.createElement('div');
+      el.className = 'note-option' + (selectedPatterns.has(p.id) ? ' selected' : '');
+      el.dataset.id = p.id;
+
+      const svgHtml = renderNoteOption(p);
+      const nameEl = document.createElement('div');
+      nameEl.className = 'note-name';
+      nameEl.textContent = p.label;
+
+      el.innerHTML = svgHtml;
+      el.appendChild(nameEl);
+
+      el.addEventListener('click', () => {
+        if (selectedPatterns.has(p.id)) {
+          if (selectedPatterns.size > 1) {
+            selectedPatterns.delete(p.id);
+            el.classList.remove('selected');
+          }
+        } else {
+          selectedPatterns.add(p.id);
+          el.classList.add('selected');
+        }
+        updateSelectAllBtn();
+      });
+
+      row.appendChild(el);
+    });
+
+    noteGrid.appendChild(row);
+  });
+
+  updateSelectAllBtn();
+}
+
+function updateSelectAllBtn() {
+  const allSelected = selectedPatterns.size === PATTERNS.length;
+  selectAllBtn.textContent = allSelected ? 'NONE' : 'ALL';
+}
+
+selectAllBtn.addEventListener('click', () => {
+  const allSelected = selectedPatterns.size === PATTERNS.length;
+  if (allSelected) {
+    // Keep at least one
+    selectedPatterns = new Set([PATTERNS[0].id]);
+  } else {
+    selectedPatterns = new Set(PATTERNS.map(p => p.id));
+  }
+  document.querySelectorAll('.note-option').forEach(el => {
+    el.classList.toggle('selected', selectedPatterns.has(el.dataset.id));
+  });
+  updateSelectAllBtn();
+});
+
+// --- RHYTHM GENERATION ---
+function getTimeSignatureBeats() {
+  const v = parseInt(timeSigSelect.value);
+  return v; // beats per measure (4, 3, or 6)
+}
+
+function generateRhythm() {
+  const measures = parseInt(document.getElementById('measuresSelect').value);
+  const beatsPerMeasure = getTimeSignatureBeats();
+  const available = PATTERNS.filter(p => selectedPatterns.has(p.id));
+
+  if (available.length === 0) return;
+
+  currentRhythm = [];
+
+  for (let m = 0; m < measures; m++) {
+    const measure = [];
+    let beatsUsed = 0;
+    const target = beatsPerMeasure; // in quarter beats
+
+    let bIdx = 0;
+    while (beatsUsed < target) {
+      const remaining = target - beatsUsed;
+      const key = `${m}-${bIdx}`;
+      // If this beat is frozen and the old rhythm has a pattern here, keep it
+      if (frozenBeats.has(key) && currentRhythm[m] && currentRhythm[m][bIdx]) {
+        const kept = currentRhythm[m][bIdx];
+        if ((kept.dur16 / 4) <= remaining) {
+          measure.push(kept);
+          beatsUsed += kept.dur16 / 4;
+          bIdx++;
+          continue;
+        }
+      }
+      const fits = available.filter(p => (p.dur16 / 4) <= remaining);
+      if (fits.length === 0) break;
+      const chosen = fits[Math.floor(Math.random() * fits.length)];
+      measure.push(chosen);
+      beatsUsed += chosen.dur16 / 4;
+      bIdx++;
+    }
+    currentRhythm.push(measure);
+  }
+
+  renderRhythm();
+  buildFlatBeats();
+}
+
+// --- RENDER RHYTHM ---
+function renderRhythm() {
+  if (currentRhythm.length === 0) {
+    emptyState.hidden = false;
+    measuresContainer.hidden = true;
+    progressBarContainer.hidden = true;
+    return;
+  }
+
+  emptyState.hidden = true;
+  measuresContainer.hidden = false;
+  progressBarContainer.hidden = false;
+  measuresContainer.innerHTML = '';
+
+  currentRhythm.forEach((measure, mIdx) => {
+    const row = document.createElement('div');
+    row.className = 'measure-row';
+
+    const label = document.createElement('div');
+    label.className = 'measure-label';
+    label.textContent = mIdx + 1;
+    row.appendChild(label);
+
+    const beatsEl = document.createElement('div');
+    beatsEl.className = 'measure-beats';
+
+    measure.forEach((pattern, bIdx) => {
+      const group = document.createElement('div');
+      group.className = 'beat-group';
+      group.dataset.measure = mIdx;
+      group.dataset.beat = bIdx;
+      group.id = `beat-${mIdx}-${bIdx}`;
+      group.innerHTML = renderBeatGroup(pattern);
+
+      // Restore frozen state if this beat was previously frozen
+      if (frozenBeats.has(`${mIdx}-${bIdx}`)) group.classList.add('frozen');
+
+      group.addEventListener('click', () => {
+        const key = `${mIdx}-${bIdx}`;
+        if (frozenBeats.has(key)) {
+          frozenBeats.delete(key);
+          group.classList.remove('frozen');
+        } else {
+          frozenBeats.add(key);
+          group.classList.add('frozen');
+        }
+      });
+
+      beatsEl.appendChild(group);
+    });
+
+    row.appendChild(beatsEl);
+    measuresContainer.appendChild(row);
+  });
+}
+
+// --- FLAT BEAT LIST FOR SCHEDULING ---
+function buildFlatBeats() {
+  allBeats = [];
+  const bpm = parseInt(bpmSlider.value);
+  const secPerBeat = 60 / bpm;
+  let t = 0;
+
+  currentRhythm.forEach((measure, mIdx) => {
+    measure.forEach((pattern, bIdx) => {
+      const durSec = (pattern.dur16 / 4) * secPerBeat;
+      allBeats.push({
+        measureIdx: mIdx,
+        beatIdx: bIdx,
+        time: t,
+        dur: durSec,
+        pattern
+      });
+      t += durSec;
+    });
+  });
+
+  totalBeats = allBeats.length;
+}
+
+// --- AUDIO ---
+function getAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
+
+// Metronome click — accent on every beat-0 of a measure (consistent pitch across all loops)
+function scheduleClick(time, isAccent) {
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.frequency.value = isAccent ? 1200 : 900;
+  gain.gain.setValueAtTime(isAccent ? 0.35 : 0.22, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+
+  osc.start(time);
+  osc.stop(time + 0.06);
+}
+
+// Rhythm guide: wood-block percussive click for note onsets
+function scheduleRhythmClick(time) {
+  if (!rhythmGuideOn) return;
+  const ctx = getAudioCtx();
+  const bufLen = Math.floor(ctx.sampleRate * 0.04);
+  const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const bpf = ctx.createBiquadFilter();
+  bpf.type = 'bandpass';
+  bpf.frequency.value = 1800;
+  bpf.Q.value = 3;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.45, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+  src.connect(bpf);
+  bpf.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(time);
+  src.stop(time + 0.05);
+}
+
+const LOOKAHEAD = 0.1; // seconds ahead to schedule
+const SCHEDULE_INTERVAL = 25; // ms between scheduler calls
+
+let scheduledBeats = []; // {beatFlatIdx, time, loopIdx} for visual sync
+
+function scheduler() {
+  if (!isPlaying) return;
+  const ctx = getAudioCtx();
+  const elapsed = ctx.currentTime - playStartTime;
+  const loopDur = allBeats.length > 0 ? allBeats[allBeats.length - 1].time + allBeats[allBeats.length - 1].dur : 1;
+  while (nextNoteTime < ctx.currentTime + LOOKAHEAD) {
+    // Figure out which loop and beat (always infinite)
+    const loopIdx = Math.floor((nextNoteTime - playStartTime) / loopDur);
+
+    const loopStart = playStartTime + loopIdx * loopDur;
+    const withinLoop = nextNoteTime - loopStart;
+
+    // find which beat this is
+    let beatIdx = 0;
+    for (let i = 0; i < allBeats.length; i++) {
+      if (Math.abs(allBeats[i].time - withinLoop) < 0.01) {
+        beatIdx = i;
+        break;
+      }
+    }
+
+    const beat = allBeats[beatIdx];
+    if (!beat) { nextNoteTime += 0.1; break; }
+
+    // Metronome: always click on every beat group (including rests)
+    scheduleClick(nextNoteTime, beat.beatIdx === 0);
+
+    // Rhythm guide: click on each note onset within this beat group
+    if (rhythmGuideOn) {
+      const secPer16 = beat.dur / beat.pattern.dur16;
+      let elapsed16 = 0;
+      beat.pattern.beats.forEach(b => {
+        if (b.t === 'n') {
+          scheduleRhythmClick(nextNoteTime + elapsed16 * secPer16);
+        }
+        elapsed16 += b.d;
+      });
+    }
+
+    scheduledBeats.push({ flatIdx: beatIdx, time: nextNoteTime, loopIdx });
+    nextNoteTime += beat.dur;
+  }
+
+  schedulerTimer = setTimeout(scheduler, SCHEDULE_INTERVAL);
+}
+
+// Mutate a single beat in-place and refresh its DOM cell
+function maybeMutateBeat(flatIdx) {
+  const beat = allBeats[flatIdx];
+  if (!beat) return;
+  // Skip frozen beats
+  if (frozenBeats.has(`${beat.measureIdx}-${beat.beatIdx}`)) return;
+  const available = PATTERNS.filter(p => selectedPatterns.has(p.id));
+  if (available.length === 0) return;
+  const newPattern = available[Math.floor(Math.random() * available.length)];
+  // Update data structures
+  currentRhythm[beat.measureIdx][beat.beatIdx] = newPattern;
+  allBeats[flatIdx] = { ...beat, pattern: newPattern };
+  // Refresh the DOM cell (keep the beat-group shell, just swap its content)
+  const el = document.getElementById(`beat-${beat.measureIdx}-${beat.beatIdx}`);
+  if (el) {
+    // preserve active/played classes, just replace inner SVG
+    const wasActive = el.classList.contains('active');
+    const wasPlayed = el.classList.contains('played');
+    el.innerHTML = renderBeatGroup(newPattern);
+    if (wasActive) el.classList.add('active');
+    if (wasPlayed) el.classList.add('played');
+    // brief flash to signal the change
+    el.style.transition = 'background 0s';
+    el.style.background = 'var(--note-selected)';
+    setTimeout(() => { el.style.background = ''; el.style.transition = ''; }, 300);
+  }
+}
+
+// Visual sync using requestAnimationFrame
+let rafId = null;
+
+function visualSync() {
+  if (!isPlaying) return;
+  const ctx = getAudioCtx();
+  const now = ctx.currentTime;
+  const loopDur = allBeats.length > 0 ? allBeats[allBeats.length - 1].time + allBeats[allBeats.length - 1].dur : 1;
+
+  // Find the currently playing beat
+  let currentBeat = null;
+  for (let i = scheduledBeats.length - 1; i >= 0; i--) {
+    const sb = scheduledBeats[i];
+    if (sb.time <= now) {
+      currentBeat = sb;
+      break;
+    }
+  }
+
+  // Highlight + mutation on beat transition
+  const prevActiveFlatIdx = (() => {
+    const el = document.querySelector('.beat-group.active');
+    if (!el) return -1;
+    const m = parseInt(el.dataset.measure), b = parseInt(el.dataset.beat);
+    return allBeats.findIndex(x => x.measureIdx === m && x.beatIdx === b);
+  })();
+
+  document.querySelectorAll('.beat-group.active').forEach(el => {
+    el.classList.remove('active');
+    el.classList.add('played');
+  });
+
+  const newFlatIdx = currentBeat !== null ? currentBeat.flatIdx : -1;
+
+  // When the active beat advances, mutate the beat we just left
+  if (newFlatIdx !== prevActiveFlatIdx && prevActiveFlatIdx >= 0) {
+    // Loop wrap-around: reset the guard so every beat can mutate again
+    if (newFlatIdx >= 0 && newFlatIdx <= prevActiveFlatIdx) {
+      mutatedThisLoop = new Set();
+    }
+    if (!mutatedThisLoop.has(prevActiveFlatIdx)) {
+      mutatedThisLoop.add(prevActiveFlatIdx);
+      if (mutationProb > 0 && Math.random() < mutationProb) {
+        maybeMutateBeat(prevActiveFlatIdx);
+      }
+    }
+  }
+
+  if (currentBeat !== null) {
+    const beat = allBeats[currentBeat.flatIdx];
+    if (beat) {
+      const el = document.getElementById(`beat-${beat.measureIdx}-${beat.beatIdx}`);
+      if (el) {
+        el.classList.add('active');
+        el.classList.remove('played');
+      }
+    }
+  }
+
+  // Progress bar — always shows position within current loop
+  const elapsed = now - playStartTime;
+  const pct = ((elapsed % loopDur) / loopDur) * 100;
+  progressBar.style.width = pct + '%';
+
+  // Clean old scheduled beats
+  if (scheduledBeats.length > allBeats.length * 3) {
+    scheduledBeats = scheduledBeats.slice(-allBeats.length * 2);
+  }
+
+  rafId = requestAnimationFrame(visualSync);
+}
+
+function startPlayback() {
+  if (currentRhythm.length === 0) {
+    generateRhythm();
+  }
+  if (allBeats.length === 0) buildFlatBeats();
+
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+
+  isPlaying = true;
+  mutatedThisLoop = new Set();
+  playStartTime = ctx.currentTime + 0.1;
+  nextNoteTime = playStartTime;
+  scheduledBeats = [];
+  progressBar.style.width = '0%';
+
+  // Reset played state
+  document.querySelectorAll('.beat-group').forEach(el => el.classList.remove('played', 'active'));
+
+  playLabel.textContent = 'Stop';
+  playIcon.innerHTML = '<rect x="3" y="2" width="3" height="10" rx="1"/><rect x="8" y="2" width="3" height="10" rx="1"/>';
+  playBtn.classList.add('btn-primary');
+
+  scheduler();
+  rafId = requestAnimationFrame(visualSync);
+}
+
+function stopPlayback() {
+  isPlaying = false;
+  clearTimeout(schedulerTimer);
+  if (rafId) cancelAnimationFrame(rafId);
+
+  playLabel.textContent = 'Play';
+  playIcon.innerHTML = '<path d="M3 2l9 5-9 5V2z"/>';
+
+  document.querySelectorAll('.beat-group').forEach(el => el.classList.remove('active', 'played'));
+  progressBar.style.width = '0%';
+}
+
+// --- EVENTS ---
+const mutationSlider = document.getElementById('mutationSlider');
+const mutationDisplay = document.getElementById('mutationDisplay');
+mutationSlider.addEventListener('input', () => {
+  mutationProb = parseInt(mutationSlider.value) / 100;
+  mutationDisplay.textContent = mutationSlider.value + '%';
+});
+
+const rhythmGuideBtn = document.getElementById('rhythmGuideBtn');
+const rhythmGuideLabel = document.getElementById('rhythmGuideLabel');
+rhythmGuideBtn.addEventListener('click', () => {
+  rhythmGuideOn = !rhythmGuideOn;
+  rhythmGuideBtn.style.borderColor = rhythmGuideOn ? 'var(--accent)' : '';
+  rhythmGuideBtn.style.color = rhythmGuideOn ? 'var(--accent)' : '';
+  rhythmGuideLabel.textContent = rhythmGuideOn ? 'Guide ●' : 'Guide';
+});
+
+bpmSlider.addEventListener('input', () => {
+  bpmDisplay.textContent = bpmSlider.value;
+  buildFlatBeats();
+  if (isPlaying) {
+    stopPlayback();
+    setTimeout(startPlayback, 50);
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target === document.body) {
+    e.preventDefault();
+    if (isPlaying) stopPlayback(); else startPlayback();
+  }
+});
+
+playBtn.addEventListener('click', () => {
+  if (isPlaying) {
+    stopPlayback();
+  } else {
+    startPlayback();
+  }
+});
+
+randomizeBtn.addEventListener('click', () => {
+  const wasPlaying = isPlaying;
+  if (isPlaying) stopPlayback();
+  generateRhythm();
+  if (wasPlaying) setTimeout(startPlayback, 50);
+});
+
+document.getElementById('measuresSelect').addEventListener('change', () => {
+  const wasPlaying = isPlaying;
+  if (isPlaying) stopPlayback();
+  if (currentRhythm.length > 0) generateRhythm();
+});
+
+document.getElementById('timeSigSelect').addEventListener('change', () => {
+  const wasPlaying = isPlaying;
+  if (isPlaying) stopPlayback();
+  if (currentRhythm.length > 0) generateRhythm();
+});
+
+// --- INIT ---
+buildNoteGrid();
+
+// Restore BPM
+try {
+  const saved = localStorage.getItem('rhythmgen_bpm');
+  if (saved) { bpmSlider.value = saved; bpmDisplay.textContent = saved; }
+} catch(e) {}
+
+bpmSlider.addEventListener('change', () => {
+  try { localStorage.setItem('rhythmgen_bpm', bpmSlider.value); } catch(e) {}
+});
+
+// Auto-generate on load
+generateRhythm();
+</script>
+
+</body></html>
