@@ -322,13 +322,7 @@ body {
 }
 
 .bpm-display {
-  font-family: 'Space Mono', monospace;
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--fg);
-  font-variant-numeric: tabular-nums;
-  min-width: 60px;
-  text-align: center;
+  display: none;
 }
 
 input[type="range"] {
@@ -471,12 +465,68 @@ select {
   text-align: center;
 }
 
+.val-inline {
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--fg);
+  margin-left: 5px;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 5px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  vertical-align: middle;
+  transition: background 0.15s, border-color 0.15s;
+}
+.val-inline:not(.val-inline--static):hover {
+  background: var(--surface3, var(--surface2));
+  border-color: var(--accent);
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--surface2);
+  color: var(--fg);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.btn-icon:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--note-selected);
+}
+
+.bpm-input {
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+  background: var(--surface2);
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+  width: 56px;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+  vertical-align: middle;
+}
+.bpm-input::-webkit-inner-spin-button,
+.bpm-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
 /* ---- RESPONSIVE ---- */
 @media (max-width: 500px) {
   .settings-row { gap: 12px; }
   .transport { gap: 8px; }
   .btn-primary { min-width: 110px; font-size: 13px; }
-  .bpm-display { font-size: 22px; }
   .note-grid { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); }
 }
 
@@ -503,7 +553,7 @@ select {
   <div class="rhythm-display" id="rhythmDisplay">
     <div class="empty-state" id="emptyState">
       <p>𝄞</p>
-      <p>Press <strong>Randomize</strong> to generate a rhythm</p>
+      <p>Press the <strong>shuffle</strong> button to generate a rhythm</p>
     </div>
     <div class="measures-container" id="measuresContainer" hidden></div>
     <div class="progress-bar-container" id="progressBarContainer" hidden>
@@ -513,10 +563,6 @@ select {
 
   <!-- Transport -->
   <div class="transport">
-    <button class="btn btn-secondary" id="randomizeBtn">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M10 2h2v2h-2V2zm0 8h2v2h-2v-2zM2 4h2v6H2V4zm3 0h5v1H5V4zm0 5h5v1H5V9zm3-3h2v2H8V6z"/></svg>
-      Randomize
-    </button>
     <button class="btn btn-primary" id="playBtn">
       <svg id="playIcon" width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M3 2l9 5-9 5V2z"/></svg>
       <span id="playLabel">Play</span>
@@ -529,11 +575,11 @@ select {
 
   <!-- Settings -->
   <div class="settings-row">
-    <div class="setting-group">
-      <div class="setting-label">Tempo</div>
+    <div class="setting-group" style="min-width:180px">
+      <div class="setting-label">Tempo <span class="val-inline" id="bpmLabelInline" title="Click to type a value">90</span></div>
       <div class="setting-control">
         <input type="range" id="bpmSlider" min="40" max="240" value="90" step="1">
-        <div class="bpm-display" id="bpmDisplay">90</div>
+        <input type="number" id="bpmInput" class="bpm-input" min="40" max="240" value="90" style="display:none">
       </div>
     </div>
     <div class="setting-group" style="max-width:110px">
@@ -552,11 +598,20 @@ select {
         <option value="2">2/4</option>
       </select>
     </div>
-    <div class="setting-group">
-      <div class="setting-label">Mutation</div>
+    <div class="setting-group" style="min-width:180px">
+      <div class="setting-label">Randomize <span class="val-inline val-inline--static" id="mutationLabelInline">0%</span></div>
       <div class="setting-control">
         <input type="range" id="mutationSlider" min="0" max="100" value="0" step="1">
-        <div class="bpm-display" id="mutationDisplay" style="font-size:18px;min-width:44px">0%</div>
+        <button class="btn btn-icon" id="randomizeBtn" title="Randomize unlocked beats">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 4h2.5a4 4 0 0 1 3.2 1.6L8 7"/>
+            <path d="M15 4h-2.5a4 4 0 0 0-3.2 1.6L8 7"/>
+            <path d="M8 9l1.3 1.4A4 4 0 0 0 12.5 12H15"/>
+            <path d="M8 9l-1.3 1.4A4 4 0 0 1 3.5 12H1"/>
+            <polyline points="13 2 15 4 13 6"/>
+            <polyline points="13 10 15 12 13 14"/>
+          </svg>
+        </button>
       </div>
     </div>
   </div>
@@ -1515,10 +1570,10 @@ function stopPlayback() {
 
 // --- EVENTS ---
 const mutationSlider = document.getElementById('mutationSlider');
-const mutationDisplay = document.getElementById('mutationDisplay');
+const mutationLabelInline = document.getElementById('mutationLabelInline');
 mutationSlider.addEventListener('input', () => {
   mutationProb = parseInt(mutationSlider.value) / 100;
-  mutationDisplay.textContent = mutationSlider.value + '%';
+  mutationLabelInline.textContent = mutationSlider.value + '%';
 });
 
 const rhythmGuideBtn = document.getElementById('rhythmGuideBtn');
@@ -1530,8 +1585,42 @@ rhythmGuideBtn.addEventListener('click', () => {
   rhythmGuideLabel.textContent = rhythmGuideOn ? 'Guide ●' : 'Guide';
 });
 
+const bpmInput = document.getElementById('bpmInput');
+const bpmLabelInline = document.getElementById('bpmLabelInline');
+
+function applyBpm(val) {
+  val = Math.max(40, Math.min(240, parseInt(val) || 90));
+  bpmSlider.value = val;
+  bpmLabelInline.textContent = val;
+  bpmInput.value = val;
+  try { localStorage.setItem('rhythmgen_bpm', val); } catch(e) {}
+  if (isPlaying) { stopPlayback(); setTimeout(startPlayback, 50); }
+}
+
+function openBpmInput() {
+  bpmInput.value = bpmSlider.value;
+  bpmLabelInline.style.display = 'none';
+  bpmInput.style.display = 'inline';
+  bpmInput.focus();
+  bpmInput.select();
+}
+
+function closeBpmInput() {
+  applyBpm(bpmInput.value);
+  bpmInput.style.display = 'none';
+  bpmLabelInline.style.display = '';
+}
+
+bpmLabelInline.addEventListener('click', openBpmInput);
+
+bpmInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); closeBpmInput(); }
+  if (e.key === 'Escape') { bpmInput.style.display = 'none'; bpmLabelInline.style.display = ''; }
+});
+bpmInput.addEventListener('blur', closeBpmInput);
+
 bpmSlider.addEventListener('input', () => {
-  bpmDisplay.textContent = bpmSlider.value;
+  bpmLabelInline.textContent = bpmSlider.value;
   buildFlatBeats();
   if (isPlaying) {
     stopPlayback();
@@ -1557,7 +1646,25 @@ playBtn.addEventListener('click', () => {
 randomizeBtn.addEventListener('click', () => {
   const wasPlaying = isPlaying;
   if (isPlaying) stopPlayback();
-  generateRhythm();
+  if (currentRhythm.length === 0) {
+    generateRhythm();
+  } else {
+    // Only randomize unlocked beats; frozen ones keep their pattern
+    const available = PATTERNS.filter(p => selectedPatterns.has(p.id));
+    if (available.length === 0) return;
+    currentRhythm.forEach((measure, mIdx) => {
+      measure.forEach((pattern, bIdx) => {
+        if (frozenBeats.has(`${mIdx}-${bIdx}`)) return;
+        const beatsUsed = measure.slice(0, bIdx).reduce((s, p) => s + p.dur16 / 4, 0);
+        const remaining = getTimeSignatureBeats() - beatsUsed;
+        const fits = available.filter(p => (p.dur16 / 4) <= remaining);
+        if (fits.length === 0) return;
+        measure[bIdx] = fits[Math.floor(Math.random() * fits.length)];
+      });
+    });
+    renderRhythm();
+    buildFlatBeats();
+  }
   if (wasPlaying) setTimeout(startPlayback, 50);
 });
 
@@ -1579,7 +1686,7 @@ buildNoteGrid();
 // Restore BPM
 try {
   const saved = localStorage.getItem('rhythmgen_bpm');
-  if (saved) { bpmSlider.value = saved; bpmDisplay.textContent = saved; }
+  if (saved) { bpmSlider.value = saved; bpmLabelInline.textContent = saved; }
 } catch(e) {}
 
 bpmSlider.addEventListener('change', () => {
