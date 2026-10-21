@@ -1594,6 +1594,7 @@ function applyBpm(val) {
   bpmLabelInline.textContent = val;
   bpmInput.value = val;
   try { localStorage.setItem('rhythmgen_bpm', val); } catch(e) {}
+  buildFlatBeats();
   if (isPlaying) { stopPlayback(); setTimeout(startPlayback, 50); }
 }
 
